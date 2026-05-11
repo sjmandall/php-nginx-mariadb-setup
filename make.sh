@@ -38,11 +38,27 @@ create_project_structure() {
   mkdir -p "${PROJECT_DIR}/app"
   mkdir -p "${PROJECT_DIR}/nginx"
 
+  # Dockerfile for PHP
+  if [ ! -f "${PROJECT_DIR}/Dockerfile" ]; then
+    cat > "${PROJECT_DIR}/Dockerfile" <<'DOCKER'
+FROM php:8.3-fpm
+
+# Install PHP extensions for MariaDB/MySQL
+RUN docker-php-ext-install mysqli pdo pdo_mysql
+
+WORKDIR /var/www/html
+DOCKER
+    echo "Created Dockerfile"
+  else
+    echo "Dockerfile already exists, skipping."
+  fi
+
+  # docker-compose.yml
   if [ ! -f "${PROJECT_DIR}/docker-compose.yml" ]; then
     cat > "${PROJECT_DIR}/docker-compose.yml" <<'YAML'
 services:
   php:
-    image: php:8.3-fpm
+    build: .
     container_name: php_app
     volumes:
       - ./app:/var/www/html
@@ -81,6 +97,7 @@ YAML
     echo "docker-compose.yml already exists, skipping."
   fi
 
+  # Nginx config
   if [ ! -f "${PROJECT_DIR}/nginx/default.conf" ]; then
     cat > "${PROJECT_DIR}/nginx/default.conf" <<'NGINX'
 server {
@@ -106,6 +123,7 @@ NGINX
     echo "nginx/default.conf already exists, skipping."
   fi
 
+  # PHP files
   if [ ! -f "${PROJECT_DIR}/app/index.php" ]; then
     cat > "${PROJECT_DIR}/app/index.php" <<'PHP'
 <?php
@@ -116,18 +134,41 @@ PHP
     echo "app/index.php already exists, skipping."
   fi
 
+  if [ ! -f "${PROJECT_DIR}/app/test_db.php" ]; then
+    cat > "${PROJECT_DIR}/app/test_db.php" <<'PHP'
+<?php
+$host = 'mariadb';
+$db   = 'appdb';
+$user = 'appuser';
+$pass = 'apppass123';
+$dsn  = "mysql:host=$host;dbname=$db;charset=utf8mb4";
+
+try {
+    $pdo = new PDO($dsn, $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    echo "DB connection OK\n";
+} catch (PDOException $e) {
+    echo "DB connection FAILED: " . $e->getMessage() . "\n";
+}
+PHP
+    echo "Created app/test_db.php"
+  else
+    echo "app/test_db.php already exists, skipping."
+  fi
+
+  # Makefile
   if [ ! -f "${PROJECT_DIR}/Makefile" ]; then
     cat > "${PROJECT_DIR}/Makefile" <<'MAKE'
-.PHONY: up down restart logs ps clean
+.PHONY: up down restart logs ps clean db-test
 
 up:
-	docker compose up -d
+	docker compose up -d --build
 
 down:
 	docker compose down
 
 restart:
-	docker compose down && docker compose up -d
+	docker compose down && docker compose up -d --build
 
 logs:
 	docker compose logs -f
@@ -137,6 +178,9 @@ ps:
 
 clean:
 	docker compose down -v
+
+db-test:
+	docker compose exec php php /var/www/html/test_db.php
 MAKE
     echo "Created Makefile"
   else
@@ -165,8 +209,10 @@ main() {
   echo "Next steps:"
   echo "  cd ${PROJECT_DIR}"
   echo "  make up"
+  echo "  make db-test"
   echo "Then open:"
   echo "  http://localhost:8050"
 }
 
 main
+
