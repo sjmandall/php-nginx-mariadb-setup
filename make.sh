@@ -69,7 +69,7 @@ services:
     image: nginx:alpine
     container_name: nginx_web
     ports:
-      - "8050:80"
+      - "80:80"
     volumes:
       - ./app:/var/www/html
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
@@ -102,7 +102,7 @@ YAML
     cat > "${PROJECT_DIR}/nginx/default.conf" <<'NGINX'
 server {
     listen 80;
-    server_name localhost;
+    server_name webpage localhost;
     root /var/www/html;
     index index.php index.html;
 
@@ -211,7 +211,7 @@ main() {
   echo "  make up"
   echo "  make db-test"
   echo "Then open:"
-  echo "  http://localhost:8050"
+  echo "  http://webpage"
 }
 
 main
